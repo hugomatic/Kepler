@@ -357,15 +357,29 @@ class WorldBase(DirectObject):
     def key_n(self):    
         self.controller.key_n()    
    
-
-class World(WorldBase):
-  
-  def __init__(self, controller, log_2_memory):
+class BallPlateWorld(WorldBase):
+    
+  def __init__(self, controller, log_2_memory):    
     WorldBase.__init__(self, controller, log_2_memory)
     self.last_time = time.time()
     self.step = 0
     self.__init_kepler_scene()
-          
+  
+  def set_3d_scene(self, x,y,z, alpha, beta, dt):
+    new_position = Point3(x,y,z)
+    self.maze.setP(-self.alpha)
+    self.maze.setR(-self.beta)
+    self.ballRoot.setPos(new_position)
+
+    #This block of code rotates the ball. It uses a quaternion
+    #to rotate the ball around an arbitrary axis. That axis perpendicular to
+    #the balls rotation, and the amount has to do with the size of the ball
+    #This is multiplied on the previous rotation to incrimentally turn it.
+    prevRot = LRotationf(self.ball.getQuat())
+    axis = UP.cross(self.ballV)
+    newRot = LRotationf(axis, 45.5 * dt * self.ballV.length())
+    self.ball.setQuat(prevRot * newRot)
+
  
   def __init_kepler_scene(self):
     self.hud_count_down = 0
@@ -532,12 +546,6 @@ class World(WorldBase):
     #traverser as the one to be called automatically
     base.cTrav = self.cTrav
 
-    #Create the movement task, but first make sure it is not already running
-    #taskMgr.remove("rollTask")
-    self.mainLoop = taskMgr.add(self.rollTask, "rollTask")
-    self.mainLoop.last = 0
-    
-
   #This function handles the collision between the ray and the ground
   #Information about the interaction is passed in colEntry
   def groundCollideHandler(self, colEntry):
@@ -590,17 +598,8 @@ class World(WorldBase):
         self.hud_count_down = 5
         p1, p2 = self.get_ball_position()
         text =  "\nalpha: %.5f\nbeta: %.5f\npos [%.05f,%.05f]\n" % (self.alpha, self.beta, p1,p2)
-        
-        
-#        if self.show_details and self.controller:
-#            text += "\n\n"
-#            data = self.controller.get_display_data()
-#            for name, value in data.iteritems():
-#                if name == 'self': continue
-#                text += "%s: %s\n" % (name,value)
         self.instructions.setText(text) 
     
-  
   def control_task(self,task):
         delta_time = task.time - self.last_time
         self.last_time = task.time
@@ -611,8 +610,7 @@ class World(WorldBase):
         if self.logging:
             data = self.controller.get_display_data()
             self.log.snapshot(get_data_logger(), self.step, task.time, data, ('self'))        
-
-  
+ 
   def get_table_inclination(self):
       angle1 = math.radians(self.alpha)
       angle2 = math.radians(self.beta)
@@ -628,22 +626,17 @@ class World(WorldBase):
       p2 = p[1]
       #print "ball position [%s, %s]" % (p1, p2)
       return (p1, p2)
+    
+    
+class BallPlateSimulatorWorld(BallPlateWorld):
   
-  def set_3d_scene(self, x,y,z, alpha, beta, dt):
-    new_position = Point3(x,y,z)
-    self.maze.setP(-self.alpha)
-    self.maze.setR(-self.beta)
-    self.ballRoot.setPos(new_position)
-
-    #This block of code rotates the ball. It uses a quaternion
-    #to rotate the ball around an arbitrary axis. That axis perpendicular to
-    #the balls rotation, and the amount has to do with the size of the ball
-    #This is multiplied on the previous rotation to incrimentally turn it.
-    prevRot = LRotationf(self.ball.getQuat())
-    axis = UP.cross(self.ballV)
-    newRot = LRotationf(axis, 45.5 * dt * self.ballV.length())
-    self.ball.setQuat(prevRot * newRot)
-  
+  def __init__(self, controller, log_2_memory):
+    BallPlateWorld.__init__(self, controller, log_2_memory)
+    #Create the movement task, but first make sure it is not already running
+    #taskMgr.remove("rollTask")
+    self.mainLoop = taskMgr.add(self.rollTask, "rollTask")
+    self.mainLoop.last = 0
+   
   #This is the task that deals with making everything interactive
   def rollTask(self, task):
     #Standard technique for finding the amount of time since the last frame
