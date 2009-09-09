@@ -24,9 +24,7 @@ from direct.interval.MetaInterval import Sequence,Parallel
 from direct.interval.LerpInterval import LerpFunc
 from direct.interval.FunctionInterval import Func,Wait
 from direct.task.Task import Task
-
 import sys
-
 from kepler_data import *
 
 #Some constants for the program
@@ -201,11 +199,11 @@ def process_model(model):
     geom_maze.addGeom(create_table_geom())  
     add_collision_nodes(model)
     
-    #print 'after:'
-    #print_tree(model, True)
     
 class WorldBase(DirectObject):
-    
+    """
+    Basic 3D world with logging and 2D display
+    """
     def __init__(self, controller, mem_logger):
         
         self.labels = OnscreenText( "", style = 1, fg = ( 1, 1, 1, 1 ), pos = ( -1.0, 0.9 ), scale = .05 )
@@ -400,7 +398,7 @@ class BallPlateWorld(WorldBase):
     
     if DISABLE_MOUSE:
         base.disableMouse()                    #Disable mouse-based camera control
-    camera.setPosHpr(0, 0, 25, 0, -90, 0)  #Place the camera
+    camera.setPosHpr(-10, -10, 25, 0, -90, 0)  #Place the camera
 
     #Load the maze and place it in the scene
     self.maze = loader.loadModel("models/maze")
