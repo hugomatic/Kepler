@@ -21,55 +21,56 @@ import struct
 
 import logging
 
+
+# Servo PID params (motor movement)
+
+# motor 1
+kp_s1 = -5. 
+ki_s1 = 0.
+kd_s1 = 0.
+
+# motor 2
+kp_s2 = 5 #2.
+ki_s2 = 0. #2.
+kd_s2 = 0. #0.05  
+
+# position 1
+kc_p1 = 1.0
+kp_p1 = -0.0713
+ki_p1 = 0.
+kd_p1 = -0.065
+
+# position 2
+kc_p2 = 1.0
+kp_p2 = -0.0713
+ki_p2 = 0.
+kd_p2 = -0.065
+
+
+
+
+# when uging keys to set PID params:
+# Key   action
+#  z    P -
+#  x    P +
+#  c    I -
+#  v    I +
+#  b    D -
+#  n    D +
 # 
-KP_DELTA = 0.005
-KI_DELTA = 0.0005
-KD_DELTA = 0.005
+KP_DELTA = 0.05
+KI_DELTA = 0.005
+KD_DELTA = 0.05
+
+
 
 log2memory = True
-
 show_serial_port_settings = True
 show_table_settings = True
 show_elctronics_params = True
 show_pid_settings = True
 
-# create logger
-logging.basicConfig(filename='kepler.log', filemode='w', level=logging.DEBUG,)
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-# create formatter
-#formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-# add formatter to ch
-# add ch to logger
 
-logger = logging.getLogger("fuzzy")
-#ch.setFormatter(formatter)
-logger.addHandler(ch)
-logger.setLevel(logging.DEBUG)
-
-
-def msgerr(msg):
-    logger.error(msg)
-
-def msgonce(msg):
-    logger.critical(msg)
-    
-def msgloop(msg):
-    """
-    Logs a recursive log message 
-    """
-    logger.debug(msg)
-
-
-
-def is_windows():
-    try:
-        import win32file
-        return True
-    except ImportError:
-        return False
-    return True
 
 def take_a_break():
     """
@@ -157,18 +158,23 @@ if show_elctronics_params:
     params.addArgument(ball_pos_max, 'Position max (1 and 2) in m', group='Load cell')
 
 
-kp_s1 = -5. 
-ki_s1 = 0.
-kd_s1 = -1.
-kp_s2 = 0.5 #2.
-ki_s2 = 0. #2.
-kd_s2 = 0. #0.05  
-kp_p1 = -0.5
-ki_p1 = 0.
-kd_p1 = -0.04
-kp_p2 = -0.0713
-ki_p2 = 0.
-kd_p2 = -0.065
+
+enable_axis_1 = True
+params.addArgument(enable_axis_1, 'Enable axis 1', group='Control')
+
+enable_axis_2 = True
+params.addArgument(enable_axis_2, 'Enable axis 2', group='Control')
+
+deriv_pv = True
+params.addArgument(deriv_pv, 'True: deriv on pos change, (false = error change)', group='Control')
+
+position_setter1 = False
+params.addArgument(position_setter1, 'Position setter on axis 1', group='Control')
+
+position_setter2 = False
+params.addArgument(position_setter2, 'Position setter on axis 2', group='Control')
+
+
 
 if show_pid_settings:
     params.addArgument(kp_s1, 'P angle 1', group='Angle')
@@ -325,11 +331,15 @@ class PidController(Controller):
                 'pid_op'+axis :self.op,
                 'pid_oi'+axis :self.oi,
                 'pid_od'+axis :self.od,
+                'pid_kc'+axis :self.kc,
+                'pid_kp'+axis :self.kp,
+                'pid_ki'+axis :self.ki,
+                'pid_kd'+axis :self.kd,
                 
                 # 'pid_error'+axis : self.pid.error,
                 # 'pid_oi'+axis : self.pid.oi,
                'pid_derivative'+axis : self.derivative,
-              'pid_integral'+axis : self.integral,
+               'pid_integral'+axis : self.integral,
                 
                 }
         
@@ -410,7 +420,7 @@ class PidController(Controller):
         if self.parent.target_position1 < ball_pos_min:
             m = 'MIN!'
             self.parent.target_position1 = ball_pos_min
-        print "Target position is %f %s" % (self.parent.target_position1, m)
+        print "Target position 1 is %f %s" % (self.parent.target_position1, m)
     
     def key_right(self): 
         m = ""
@@ -418,7 +428,24 @@ class PidController(Controller):
         if self.parent.target_position1 > ball_pos_max:
             m = 'MAX!'
             self.parent.target_position1 = ball_pos_max
-        print "Target position is %f %s" % (self.parent.target_position1, m) 
+        print "Target position 1 is %f %s" % (self.parent.target_position1, m) 
+
+    def key_up(self):  
+        m = ""
+        self.parent.target_position2 -= ball_pos_max / 10.0
+        if self.parent.target_position2 < ball_pos_min:
+            m = 'MIN!'
+            self.parent.target_position2 = ball_pos_min
+        print "Target position 2 is %f %s" % (self.parent.target_position1, m)
+    
+    def key_downt(self): 
+        m = ""
+        self.parent.target_position2 += ball_pos_max / 10.0
+        if self.parent.target_position2 > ball_pos_max:
+            m = 'MAX!'
+            self.parent.target_position2 = ball_pos_max
+        print "Target position 2 is %f %s" % (self.parent.target_position1, m) 
+
 
 class Derivator(Controller):
     
@@ -845,7 +872,7 @@ class MultiController(Controller):
         'filtered_load_cell2':self.filtered_load_cell2,
         'filtered_servo2': self.filtered_servo2,
         
-        #'error_pos2':   self.error_pos2,
+        'error_pos2':   self.error_pos2,
         #'error_change2':self.error_change2,
         #'integral2':self.integral2,
         
@@ -953,6 +980,9 @@ class MultiController(Controller):
         
         self.filtered_pos1 = load_cell1_to_position(filtered_load_cell1)
         self.filtered_pos2 = load_cell2_to_position(filtered_load_cell2)
+        
+        self.error_pos1 = self.target_position1 - self.filtered_pos1
+        self.error_pos2 = self.target_position2 - self.filtered_pos2
         
         self.filtered_encoder1 = filtered_encoder1
         self.filtered_encoder2 = filtered_encoder2
@@ -1367,7 +1397,14 @@ class EchoInterface(object):
         return 0, mot_1, mot_2, load_1, load_2 
         # return error_code, encoder1, encoder2, load_cell1, load_cell2
     
-        
+    
+def is_windows():
+    try:
+        import win32file
+        return True
+    except ImportError:
+        return False
+    return True        
             
 class KeplerSerialComm(object):
     
@@ -1458,6 +1495,36 @@ class KeplerSerialComm(object):
             
         except Exception, e:
             print "Error: ", e
+
+
+# create logger
+logging.basicConfig(filename='kepler.log', filemode='w', level=logging.DEBUG,)
+# create console handler and set level to debug
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+# create formatter
+#formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# add formatter to ch
+# add ch to logger
+
+logger = logging.getLogger("fuzzy")
+#ch.setFormatter(formatter)
+logger.addHandler(ch)
+logger.setLevel(logging.DEBUG)
+
+
+def msgerr(msg):
+    logger.error(msg)
+
+def msgonce(msg):
+    logger.critical(msg)
+    
+def msgloop(msg):
+    """
+    Logs a recursive log message 
+    """
+    logger.debug(msg)
+
 
 class Loop(object):
     
@@ -1634,11 +1701,8 @@ class Application( kepler_sim.BallPlateWorld ):
     def __init__( self, controller, log_2_memory ):
         kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory)
         
-             
-        
-    
-    def _get_data(self):
-        
+
+    def _get_data(self):  
         return data
             
 
@@ -1677,26 +1741,27 @@ if params.loadParams():
         
     if controller_name == 'pid_pid':
         
-        servo_pid1 = False
-        pid1 = False
-        position_setter1 = False
+#        servo_pid1 = False
+#        pid1 = False
+
+#        servo_pid2 = True
+#        pid2 = True
         
-        servo_pid2 = True
-        pid2 = True
-        position_setter2 = False
         
         controller = MultiController()
-        
-        
-        
+            
         angle_band = 1
         filter_band = 1
         pid_band = filter_band
         
         servo_filter1 = ServoMeanFilter(1, 5)
         servo_filter2 = ServoMeanFilter(2, 5)
-        controller.add_controller( servo_filter1, filter_band)
-        controller.add_controller( servo_filter2, filter_band)
+        if enable_axis_1:
+           controller.add_controller( servo_filter1, filter_band)
+        
+        if enable_axis_2:
+           controller.add_controller( servo_filter2, filter_band)
+        
 #        pos1_filter = None
 #        pos2_filter = None
 #        if filter_name == 'none':    
@@ -1715,59 +1780,38 @@ if params.loadParams():
 #        controller.add_controller(pos2_filter, 1)    
         
             
-        deriv1 = Derivator(1)
-        deriv2 = Derivator(2)
-        controller.add_controller( deriv1, filter_band)
-        controller.add_controller( deriv2, filter_band)    
+        
+        
+        if enable_axis_1:
+           
+           deriv1 = Derivator(1, deriv_pv)
+           controller.add_controller( deriv1, filter_band)
+        if enable_axis_2:
+           deriv2 = Derivator(2,deriv_pv)
+           controller.add_controller( deriv2, filter_band)    
     
         keyboard = False
         show_data = False
-        if servo_pid1:
+        if enable_axis_1:
             angle_controller1 = ServoPid(1, kp_s1, ki_s1, kd_s1, keyboard, show_data)
             controller.add_controller( angle_controller1, angle_band)
             
-        if servo_pid2:
+        if enable_axis_2:
             angle_controller2 = ServoPid(2, kp_s2, ki_s2, kd_s2, keyboard, show_data)
             controller.add_controller( angle_controller2, angle_band)
         
         
-        filter_error = True # false to use raw error
-        kc = 1.0
-        if pid1:
-            pid_controller1 = PidController(1,kp_p1, ki_p1, kd_p1, kc, filter_error) # split_pid 05
+        filter_error = False # false to use raw error, True to use error based on filtered position
+        
+        if enable_axis_1:
+            pid_controller1 = PidController(1,kp_p1, ki_p1, kd_p1, kc_p1, filter_error) # split_pid 05
             controller.add_controller( pid_controller1, pid_band)
             
-        if pid2:
-            pid_controller2 = PidController(2,kp_p2, ki_p2, kd_p2, kc, filter_error) # split_pid 05
+        if enable_axis_1:
+            pid_controller2 = PidController(2,kp_p2, ki_p2, kd_p2, kc_p2, filter_error) # split_pid 05
             controller.add_controller( pid_controller2, pid_band)
         
-        #(-0.025,0,-0.5) #(-0.015, 0., 0.002)
-        #(-0.01,0., 0.)#-0.0000000125,-0.01175)
-        
-        #(-0.001, -0.000000000001, -0.003) #13(-0.008, -0.000000000001, -0.032)
-        #mean11(-0.0165, -0.00000000005, -0.064)
-        #(-0.009,-0.000000018,-0.02)
-        #mean09(-0.0075,-0.0000000125,-0.01175)
-        #mean08(-0.015,-0.000000025,-0.035)
-        #mean07(-0.035,-0.00000005,-0.075)
-        #mean 05(-0.01,-0.0000005,-0.01)
-        #(-0.008,-0.0005,-0.0115)
-        #calman(-0.01,-0.0000000,-0.005)
-        
-        # calman(-0.02,-0.0000001,-0.05)
-        #pidpid6(-0.04,-0.0000001,-0.1)
-        #pidpid05(-0.07,-0.0000001,-0.15)
-        #(-0.14,-0.0000001,-0.3)
-        #pidpid_02(-0.12,-0.0000001,-0.3)
-        # pidpid_01(-0.24,-0.000,-0.8)
-        #pidpid8.log(-0.025,-0.001,-2.)
-        #pipid7.log(-0.05,0,-2.5)
-        #pidpid6(-0.05,0,-1.)
-        #(-0.025, 0,-0.32)
-        #(-0.025, 0,-0.16) #(-0.025, 0., -10.)
         pid_band = 1
-        #controller.add_controller( pid_controller1, pid_band)
-        
         if position_setter1: 
             pos_controller1 = PositionSetter(1)
             pos_band = 1
