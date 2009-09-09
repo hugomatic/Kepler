@@ -21,7 +21,24 @@ import struct
 
 import logging
 
+#
+# motor encoder calibration (should be ADC)
+# max i enc + range... min is enc - range
+#
+motor1_adc_zero = 417
+motor2_adc_zero = 413
 
+motor1_adc_swing = 50. 
+motor2_adc_swing = 50.
+
+#
+# Position sensors calibration
+# 
+load_cell1_min = 146
+load_cell1_max = 724
+
+load_cell2_min = 261
+load_cell2_max = 738
 # Servo PID params (motor movement)
 
 # motor 1
@@ -30,15 +47,15 @@ ki_s1 = 0.
 kd_s1 = 0.
 
 # motor 2
-kp_s2 = 5 #2.
-ki_s2 = 0. #2.
-kd_s2 = 0. #0.05  
+kp_s2 = 5  #
+ki_s2 = 0. #
+kd_s2 = 0. #  
 
 # position 1
 kc_p1 = 1.0
-kp_p1 = -0.0713
-ki_p1 = 0.
-kd_p1 = -0.065
+kp_p1 = -0.0713  # 30
+ki_p1 = 0.       #  0
+kd_p1 = -0.065   # 0.7
 
 # position 2
 kc_p2 = 1.0
@@ -126,28 +143,16 @@ if show_table_settings:
     params.addArgument(table_max_rot_speed , 'Table max rot speed in rad/sec', group='table')
 
 
-encoder1_min = 440. - 50. #2048.
-encoder1_max = 440. + 50. #6144.
-
-encoder2_min = 348. - 50. #2048.
-encoder2_max = 348 + 50 #6144.
-
-load_cell1_min = 159 #830
-load_cell1_max = 721 #550
-
-load_cell2_min = 260
-load_cell2_max = 700
-
 ball_pos_min = -0.3#0.
 ball_pos_max = 0.3#1.0
 
 if show_elctronics_params:
     
-    params.addArgument(encoder1_min , 'Min motor1 ADC', group='encoder')
-    params.addArgument(encoder1_max , 'Max motor1 ADC', group='encoder')
+    params.addArgument(motor1_adc_zero , 'Motor1 ADC at level (angle1 = 0)', group='ADC')
+    params.addArgument(motor2_adc_zero , 'Motor2 ADC at level (angle1 = 0)', group='ADC')
     
-    params.addArgument(encoder2_min , 'Min motor2 ADC', group='encoder')
-    params.addArgument(encoder2_max , 'Max motor2 ADC', group='encoder')
+    params.addArgument(motor1_adc_swing , 'Motor1 ADC swing (up or down)', group='encoder')
+    params.addArgument(motor2_adc_swing ,   'Motor2 ADC swing (up or down)', group='encoder')
     
     params.addArgument(load_cell1_min, 'Load cell 1 min', group='Load cell')
     params.addArgument(load_cell1_max, 'Load cell 1 max', group='Load cell')
@@ -157,6 +162,11 @@ if show_elctronics_params:
     params.addArgument(ball_pos_min, 'Position min (1 and 2) in m', group='Load cell')
     params.addArgument(ball_pos_max, 'Position max (1 and 2) in m', group='Load cell')
 
+
+encoder1_min = motor1_adc_zero - motor1_adc_swing
+encoder1_max = motor1_adc_zero + motor1_adc_swing
+encoder2_min = motor2_adc_zero - motor2_adc_swing 
+encoder2_max = motor2_adc_zero + motor2_adc_swing 
 
 
 enable_axis_1 = True
@@ -1700,7 +1710,7 @@ class Application( kepler_sim.BallPlateWorld ):
       
     def __init__( self, controller, log_2_memory ):
         kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory)
-        
+        # self.add_slider()
 
     def _get_data(self):  
         return data
