@@ -24,8 +24,13 @@ from direct.interval.MetaInterval import Sequence,Parallel
 from direct.interval.LerpInterval import LerpFunc
 from direct.interval.FunctionInterval import Func,Wait
 from direct.task.Task import Task
+
+from direct.gui.DirectGui import *
+
 import sys
 from kepler_data import *
+
+
 
 #Some constants for the program
 ACCEL = 70         #Acceleration in ft/sec/sec
@@ -242,7 +247,6 @@ class WorldBase(DirectObject):
 
         
         #self.txt = OnscreenText( "Nothing", style = 1, fg = ( 1, 1, 1, 1 ), shadow = ( .9, .9, .9, .5 ), pos = ( -1.0, 0.9 ), scale = .07 )
-
         # task to be called every frame
         
         self.step = 0
@@ -250,6 +254,7 @@ class WorldBase(DirectObject):
         
         self.text_refresh_band = 10
         self.text_refresh_count = self.text_refresh_band
+        self._set_title("Hugomatic")
 
     def _set_title(self, title):
       from pandac.PandaModules import ConfigVariableString
@@ -297,7 +302,19 @@ class WorldBase(DirectObject):
                 value = data[name]
                 txt += "%s: %s\n" % (name,value)
             self.txt.appendText(txt)
-
+ 
+    def call_back(self):
+        print "hurray"
+        
+    def add_slider(self):
+        slider = DirectSlider(range=(0,100), value=50, pageSize=3, command=self.call_back)
+        
+        left = 0.1
+        right = 0.2
+        bottom = 0.1
+        top = 0.11
+        frame = (left, right, bottom, top)
+        b = DirectButton(text = ("OK", "click!", "rolling over", "disabled"), frameSize = frame, scale=.05, command=self.call_back)
 
     def quit(self):
         self.controller.stop()
@@ -634,6 +651,9 @@ class BallPlateSimulatorWorld(BallPlateWorld):
     #taskMgr.remove("rollTask")
     self.mainLoop = taskMgr.add(self.rollTask, "rollTask")
     self.mainLoop.last = 0
+    
+    self.add_slider()
+
    
   #This is the task that deals with making everything interactive
   def rollTask(self, task):
