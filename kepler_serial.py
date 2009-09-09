@@ -1716,6 +1716,16 @@ class Application( kepler_sim.BallPlateWorld ):
         return data
             
 
+    def loop(self, task):
+       kepler_sim.BallPlateWorld.loop(self, task)
+       #x,y = self.controller.get_ball_xy()
+       x = 0.33
+       y= 0.33
+       z = 0.4 # magic number 
+       alpha = 0
+       beta = 0
+       dt = 0.05
+       self.set_3d_scene(x,y,z, alpha, beta, dt)
 
 
 
