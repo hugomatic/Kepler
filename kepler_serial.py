@@ -21,6 +21,10 @@ import struct
 
 import logging
 
+# 
+KP_DELTA = 0.005
+KI_DELTA = 0.0005
+KD_DELTA = 0.005
 
 log2memory = True
 
@@ -375,29 +379,29 @@ class PidController(Controller):
             
         if self.axis == 2:
             self.parent.target_angle2 =  self.angle_out
-            
+           
     def key_z(self): 
-        self.kp -= 0.01
+        self.kp -= KP_DELTA
         print "kp %f" %  self.kp
                
     def key_x(self):
-        self.kp += 0.01
+        self.kp += KP_DELTA
         print "kp %f" %  self.kp
         
     def key_c(self): 
-        self.ki -= 0.0005
+        self.ki -= KI_DELTA
         print "ki %f" %  self.ki
         
     def key_v(self):
-        self.ki += 0.0005
+        self.ki += KI_DELTA
         print "ki %f" %  self.ki
 
     def key_b(self): 
-        self.kd -= 0.01
+        self.kd -= KD_DELTA
         print "kd %f" %  self.kd
         
     def key_n(self):
-        self.kd += 0.01
+        self.kd += KD_DELTA
         print "kd %f" %  self.kd
        
     def key_left(self):  
@@ -1624,11 +1628,11 @@ class KalmanFilter(Filter):
     
 
 
-class Application( kepler_sim.WorldBase ):   
+class Application( kepler_sim.BallPlateWorld ):   
     #function that initializes everything needed 
       
     def __init__( self, controller, log_2_memory ):
-        kepler_sim.WorldBase.__init__(self, controller, log_2_memory)
+        kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory)
         
              
         
@@ -1824,7 +1828,7 @@ if params.loadParams():
         app = Loop(controller)
             
     if interface_name == 'simulator':
-        app = kepler_sim.World(controller,log2memory)
+        app = kepler_sim.BallPlateSimulatorWorld(controller,log2memory)
         interface = KeplerSimInterface(app)  
     interface.error_motor1 = makeError(2,1) 
     controller.set_interface(interface,None)
