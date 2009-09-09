@@ -158,7 +158,6 @@ def process_wall_collide_geom(geom):
     print 'process wall geom'
     print geom
 
-
 def add_collision_nodes(model):
     wall_collision_node_path = model.getChildren()[0].getChildren()[0]
     cnode = wall_collision_node_path.node() # get collision node
@@ -254,6 +253,10 @@ class WorldBase(DirectObject):
         self.text_refresh_band = 10
         self.text_refresh_count = self.text_refresh_band
 
+    def _set_title(self, title):
+      from pandac.PandaModules import ConfigVariableString
+      mygameserver = ConfigVariableString("window-title","Panda")
+      mygameserver.setValue(title)
 
     def loop(self, task):
         #self.last_time = time.time()
@@ -356,16 +359,15 @@ class WorldBase(DirectObject):
    
 
 class World(WorldBase):
-          
-  def _set_title(self, title):
-      from pandac.PandaModules import ConfigVariableString
-      mygameserver = ConfigVariableString("window-title","Panda")
-      mygameserver.setValue(title)
-            
+  
   def __init__(self, controller, log_2_memory):
     WorldBase.__init__(self, controller, log_2_memory)
     self.last_time = time.time()
     self.step = 0
+    self.__init_kepler_scene()
+          
+ 
+  def __init_kepler_scene(self):
     self.hud_count_down = 0
     self.alpha = 0.
     self.beta = 0.  
@@ -381,7 +383,6 @@ class World(WorldBase):
     self.instructions = OnscreenText(text="alpha: 0.000\nbeta: 0.000",
                                      pos = (-1.3, .95), fg=(1,1,1,1), font = font,
                                      align = TextNode.ALeft, scale = .05)
-    
     
     if DISABLE_MOUSE:
         base.disableMouse()                    #Disable mouse-based camera control
@@ -514,9 +515,10 @@ class World(WorldBase):
     self.ball.setMaterial(m, 1)
 
     #Finally, we call start for more initialization
-    self.start()
-
-  def start(self):
+    # self.start()
+  
+      
+    #def start(self):
     #The maze model also has a locator in it for where to start the ball
     #To access it we use the find command
     startPos = (0,0,0)#= self.maze.find("**/start").getPos()
@@ -627,6 +629,21 @@ class World(WorldBase):
       #print "ball position [%s, %s]" % (p1, p2)
       return (p1, p2)
   
+  def set_3d_scene(self, x,y,z, alpha, beta, dt):
+    new_position = Point3(x,y,z)
+    self.maze.setP(-self.alpha)
+    self.maze.setR(-self.beta)
+    self.ballRoot.setPos(new_position)
+
+    #This block of code rotates the ball. It uses a quaternion
+    #to rotate the ball around an arbitrary axis. That axis perpendicular to
+    #the balls rotation, and the amount has to do with the size of the ball
+    #This is multiplied on the previous rotation to incrimentally turn it.
+    prevRot = LRotationf(self.ball.getQuat())
+    axis = UP.cross(self.ballV)
+    newRot = LRotationf(axis, 45.5 * dt * self.ballV.length())
+    self.ball.setQuat(prevRot * newRot)
+  
   #This is the task that deals with making everything interactive
   def rollTask(self, task):
     #Standard technique for finding the amount of time since the last frame
@@ -666,9 +683,6 @@ class World(WorldBase):
     self.alpha += delta_alpha
     self.beta += delta_beta
     
-    self.maze.setP(-self.alpha)
-    self.maze.setR(-self.beta)
-
     #Finally, we move the ball
     #Update the velocity based on acceleration
     self.ballV += self.accelV * dt * ACCEL
@@ -677,17 +691,11 @@ class World(WorldBase):
       self.ballV.normalize()
       self.ballV *= MAX_SPEED
     #Update the position based on the velocity
-    self.ballRoot.setPos(self.ballRoot.getPos() + (self.ballV * dt))
-
-    #This block of code rotates the ball. It uses a quaternion
-    #to rotate the ball around an arbitrary axis. That axis perpendicular to
-    #the balls rotation, and the amount has to do with the size of the ball
-    #This is multiplied on the previous rotation to incrimentally turn it.
-    prevRot = LRotationf(self.ball.getQuat())
-    axis = UP.cross(self.ballV)
-    newRot = LRotationf(axis, 45.5 * dt * self.ballV.length())
-    self.ball.setQuat(prevRot * newRot)
     
+    new_position = self.ballRoot.getPos() + (self.ballV * dt)
+    x,y,z = new_position 
+    self.set_3d_scene(x,y,z, self.alpha, self.beta, dt)
+                      
     return Task.cont       #Continue the task indefinitely
 
   #If the ball hits a hole trigger, then it should fall in the hole.
