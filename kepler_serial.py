@@ -21,7 +21,6 @@ import struct
 
 import logging
 
-
 show_data_axis_1 = True
 show_data_axis_2 = True
 
@@ -77,8 +76,6 @@ ki_p2 = 0.
 kd_p2 = -0.065
 
 
-
-
 # when uging keys to set PID params:
 # Key   action
 #  z    P -
@@ -96,7 +93,7 @@ KD_DELTA = 0.05
 
 log2memory = True
 show_serial_port_settings = True
-show_table_settings = True
+show_table_settings = False
 show_elctronics_params = True
 show_pid_settings = True
 show_display_settings = True
@@ -161,26 +158,28 @@ ball_pos_max = 0.3#1.0
 
 if show_elctronics_params:
     
-    params.addArgument(motor1_adc_zero , 'Motor1 ADC at level (angle1 = 0)', group='ADC')
-    params.addArgument(motor2_adc_zero , 'Motor2 ADC at level (angle1 = 0)', group='ADC')
+    params.addArgument(motor1_adc_zero , 'Motor1 ADC at level (angle1 = 0)', group='signals')
+    params.addArgument(motor2_adc_zero , 'Motor2 ADC at level (angle1 = 0)', group='signals')
     
-    params.addArgument(motor1_adc_swing , 'Motor1 ADC swing (up or down)', group='encoder')
-    params.addArgument(motor2_adc_swing ,   'Motor2 ADC swing (up or down)', group='encoder')
+    params.addArgument(motor1_adc_swing , 'Motor1 ADC swing (up or down)', group='signals')
+    params.addArgument(motor2_adc_swing , 'Motor2 ADC swing (up or down)', group='signals')
     
-    params.addArgument(load_cell1_min, 'Load cell 1 min', group='Load cell')
-    params.addArgument(load_cell1_max, 'Load cell 1 max', group='Load cell')
-    params.addArgument(load_cell2_min, 'Load cell 2 min', group='Load cell')
-    params.addArgument(load_cell2_max, 'Load cell 2 max', group='Load cell')
+    params.addArgument(load_cell1_min, 'Load cell 1 min', group='signals')
+    params.addArgument(load_cell1_max, 'Load cell 1 max', group='signals')
+    params.addArgument(load_cell2_min, 'Load cell 2 min', group='signals')
+    params.addArgument(load_cell2_max, 'Load cell 2 max', group='signals')
     
-    params.addArgument(ball_pos_min, 'Position min (1 and 2) in m', group='Load cell')
-    params.addArgument(ball_pos_max, 'Position max (1 and 2) in m', group='Load cell')
+    params.addArgument(ball_pos_min, 'Position min (1 and 2) in m', group='signals')
+    params.addArgument(ball_pos_max, 'Position max (1 and 2) in m', group='signals')
 
+    params.addArgument(servo_bias, 'servo response bias', group='servo adjust' )
+    params.addArgument(servo_dead_band_up, 'servo dead band up', group='servo adjust' )
+    params.addArgument(servo_dead_band_down, 'servo dead band down', group='servo adjust' )
 
 encoder1_min = motor1_adc_zero - motor1_adc_swing
 encoder1_max = motor1_adc_zero + motor1_adc_swing
-encoder2_min = motor2_adc_zero - motor2_adc_swing 
+encoder2_min = motor2_adc_zero - motor2_adc_swing
 encoder2_max = motor2_adc_zero + motor2_adc_swing 
-
 
 enable_axis_1 = True
 params.addArgument(enable_axis_1, 'Enable axis 1', group='Control')
@@ -196,7 +195,6 @@ params.addArgument(position_setter1, 'Position setter on axis 1', group='Control
 
 position_setter2 = False
 params.addArgument(position_setter2, 'Position setter on axis 2', group='Control')
-
 
 
 if show_pid_settings:
@@ -240,21 +238,6 @@ if show_display_settings:
    params.addArgument(display_pos_ctrl, 'Display position controller data', group='Display')  
    params.addArgument(display_other, 'Display other info', group='Display') 
    
-display_categories = {
-                      'axis1':enable_axis_1 and display_axis1,
-                      'axis2':enable_axis_2 and display_axis2,
-                      'io':display_io,
-                      'angles':display_angles,
-                      'angles_ctrl':display_angles_ctrl,
-                      'pos':display_pos,
-                      'pos_ctrl':display_pos_ctrl,
-                      'dsp': dislpay_dsp,
-                      'other': display_other,
-                      'sim': display_sim,
-                     }
-
-
-    
 
 
 # Some of the Format codes
@@ -264,7 +247,6 @@ display_categories = {
 #    B     unsigned char  integer     
 #    h     short          integer     
 #    H     unsigned short integer
-
 
 
 def split_14bit_number(number):
@@ -1772,12 +1754,28 @@ class KalmanFilter(Filter):
         return self.calman.filter( history[-1])
 
 
+def toggle_display_axe1(status):
+   display_categories['axis1'] = not display_categories['axis1']
+
+def toggle_display_axe2(status):
+   display_categories['axis2'] = not display_categories['axis2']   
+
+   
 class Application( kepler_sim.BallPlateWorld ):   
     # function that initializes everything needed       
     def __init__( self, controller, log_2_memory ):
         kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory, display_categories)
         # self.add_slider()
-
+ 
+        x = -0.8
+        y = 0.75
+        inc_y = -0.1
+        self.add_check("Axis 1", display_categories['axis1'], x, y, toggle_display_axe1)
+        y += inc_y
+        self.add_check("Axis 2", display_categories['axis2'], x, y, toggle_display_axe2)
+       
+        
+        
     def _get_data(self):  
         return data
             
@@ -1798,8 +1796,24 @@ class Application( kepler_sim.BallPlateWorld ):
 #
 #                
 if params.loadParams():
+   
+    display_categories = {
+                      'axis1':enable_axis_1 and display_axis1,
+                      'axis2':enable_axis_2 and display_axis2,
+                      'io':display_io,
+                      'angles':display_angles,
+                      'angles_ctrl':display_angles_ctrl,
+                      'pos':display_pos,
+                      'pos_ctrl':display_pos_ctrl,
+                      'dsp': dislpay_dsp,
+                      'other': display_other,
+                      'sim': display_sim,
+                     }
+   
     table_min_angle = math.asin(table_min_height/table_distance_from_center)
     table_max_angle = math.asin(table_max_height/table_distance_from_center)
+    
+    
     print "Min table angle in rads %.4f" % table_min_angle
     print "Max table angle in rads %.4f" % table_max_angle
     print "Table min rot speed  %f" % table_min_rot_speed
@@ -1825,15 +1839,8 @@ if params.loadParams():
         
     if controller_name == 'pid_pid':
         
-#        servo_pid1 = False
-#        pid1 = False
-
-#        servo_pid2 = True
-#        pid2 = True
-        
         
         controller = MultiController()
-            
         angle_band = 1
         filter_band = 1
         pid_band = filter_band

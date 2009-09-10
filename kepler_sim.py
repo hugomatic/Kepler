@@ -300,20 +300,24 @@ class WorldBase(DirectObject):
             for name in keys:
                 if name == 'self': continue
                 display_data = data[name]                
-                value, category,axis = display_data
-                if self.display_categories[category]:
-                   show_it = True
-                   if axis == 1 and not self.display_categories['axis1']:
-                      show_it = False
-                   if axis == 2 and not self.display_categories['axis2']:
-                      show_it = False
-                   if show_it:                   
-                      txt += "%s: %s\n" % (name, value)
+                value, category,axis = display_data   
+                show_it = self.display_categories[category]
+                if axis == 1 and self.display_categories['axis1']:
+                   show_it = False
+                if axis == 2 and self.display_categories['axis2']:
+                   show_it = False
+                if show_it:                   
+                   txt += "%s: %s\n" % (name, value)
             self.txt.appendText(txt)
  
     def call_back(self):
         print "hurray"
-        
+    
+    def add_check(self, text, value, x, y, callback):
+       b = DirectCheckButton(text = text ,scale=.05, pos=(x,0,y), command=callback)
+       b["indicatorValue"] = value
+       return b
+       
     def add_slider(self):
         #slider = DirectSlider(range=(0,100), value=50, pageSize=1, command=self.call_back)
         
@@ -324,7 +328,7 @@ class WorldBase(DirectObject):
         frame = (left, right, bottom, top)
         
         b = DirectButton(text = ("OK", "click!", "rolling over", "disabled"), scale=.05, pos=(-.3,.6,0), command=self.call_back)
-        b = DirectButton(text = ("ALLO", "click!", "rolling over", "disabled"), scale=.05, pos=(.3,.0,0), command=self.call_back)
+        b = DirectButton(text = ("ALLO", "click!", "rolling over", "disabled"), scale=.05, pos=(.3,-0.6,-0.5), command=self.call_back)
 
         #b['frameSize'] = frame
         b.resetFrameSize()
