@@ -209,7 +209,9 @@ class WorldBase(DirectObject):
     """
     Basic 3D world with logging and 2D display
     """
-    def __init__(self, controller, mem_logger):
+    def __init__(self, controller, mem_logger, display_categories):
+        
+        self.display_categories = display_categories
         
         self.labels = OnscreenText( "", style = 1, fg = ( 1, 1, 1, 1 ), pos = ( -1.0, 0.9 ), scale = .05 )
         self.txt = OnscreenText( "", style = 1, fg = ( 1, 1, 1, 1 ), pos = ( -0.5, 0.9 ), scale = .05 )
@@ -219,7 +221,6 @@ class WorldBase(DirectObject):
         self.show_details = True
         self.log = KeplerLogger(mem_logger)        
         self.logging = False
-    
         self.accept("p", self.key_p)
         self.accept( "escape", self.quit )
         self.accept("arrow_up", self.key_up)
@@ -279,16 +280,15 @@ class WorldBase(DirectObject):
         return Task.cont
 
     def _refresh_text(self, txt):
-        
         if not self.show_details:
             return 
-        
         self.text_refresh_count -=1
         if self.text_refresh_count <0:
             self.text_refresh_count = self.text_refresh_band
             data = self.controller.get_display_data()
-            data['Time'] = str(self.last_time)
-            data['step'] = self.step
+            st = str(self.last_time)
+            data['Time'] = (st, "sim", 0)
+            data['step'] = (self.step, "sim", 0)
             
             self.txt.clearText()
             self.txt.setAlign(TextNode.ALeft)
@@ -299,22 +299,35 @@ class WorldBase(DirectObject):
             
             for name in keys:
                 if name == 'self': continue
-                value = data[name]
-                txt += "%s: %s\n" % (name,value)
+                display_data = data[name]                
+                value, category,axis = display_data
+                if self.display_categories[category]:
+                   show_it = True
+                   if axis == 1 and not self.display_categories['axis1']:
+                      show_it = False
+                   if axis == 2 and not self.display_categories['axis2']:
+                      show_it = False
+                   if show_it:                   
+                      txt += "%s: %s\n" % (name, value)
             self.txt.appendText(txt)
  
     def call_back(self):
         print "hurray"
         
     def add_slider(self):
-        slider = DirectSlider(range=(0,100), value=50, pageSize=3, command=self.call_back)
+        #slider = DirectSlider(range=(0,100), value=50, pageSize=1, command=self.call_back)
         
         left = 0.1
         right = 0.2
         bottom = 0.1
         top = 0.11
         frame = (left, right, bottom, top)
-        b = DirectButton(text = ("OK", "click!", "rolling over", "disabled"), frameSize = frame, scale=.05, command=self.call_back)
+        
+        b = DirectButton(text = ("OK", "click!", "rolling over", "disabled"), scale=.05, pos=(-.3,.6,0), command=self.call_back)
+        b = DirectButton(text = ("ALLO", "click!", "rolling over", "disabled"), scale=.05, pos=(.3,.0,0), command=self.call_back)
+
+        #b['frameSize'] = frame
+        b.resetFrameSize()
 
     def quit(self):
         self.controller.stop()
@@ -374,8 +387,8 @@ class WorldBase(DirectObject):
    
 class BallPlateWorld(WorldBase):
     
-  def __init__(self, controller, log_2_memory):    
-    WorldBase.__init__(self, controller, log_2_memory)
+  def __init__(self, controller, log_2_memory, display_categories):    
+    WorldBase.__init__(self, controller, log_2_memory, display_categories)
     self.last_time = time.time()
     self.step = 0
     self.__init_kepler_scene()
@@ -645,8 +658,8 @@ class BallPlateWorld(WorldBase):
     
 class BallPlateSimulatorWorld(BallPlateWorld):
   
-  def __init__(self, controller, log_2_memory):
-    BallPlateWorld.__init__(self, controller, log_2_memory)
+  def __init__(self, controller, log_2_memory, display_categories):
+    BallPlateWorld.__init__(self, controller, log_2_memory, display_categories)
     #Create the movement task, but first make sure it is not already running
     #taskMgr.remove("rollTask")
     self.mainLoop = taskMgr.add(self.rollTask, "rollTask")

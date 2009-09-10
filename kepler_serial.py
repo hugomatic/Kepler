@@ -21,6 +21,11 @@ import struct
 
 import logging
 
+
+show_data_axis_1 = True
+show_data_axis_2 = True
+
+
 #
 # motor encoder calibration (should be ADC)
 # max i enc + range... min is enc - range
@@ -39,15 +44,23 @@ load_cell1_max = 724
 
 load_cell2_min = 261
 load_cell2_max = 738
+
+#
+# servo response adjustment
+servo_bias = 2.0 #1.2
+servo_dead_band_up = 200.
+servo_dead_band_down = 0.
+
+
 # Servo PID params (motor movement)
 
 # motor 1
-kp_s1 = -5. 
+kp_s1 = 1.5 
 ki_s1 = 0.
 kd_s1 = 0.
 
 # motor 2
-kp_s2 = 5  #
+kp_s2 = 1.5  #
 ki_s2 = 0. #
 kd_s2 = 0. #  
 
@@ -86,7 +99,7 @@ show_serial_port_settings = True
 show_table_settings = True
 show_elctronics_params = True
 show_pid_settings = True
-
+show_display_settings = True
 
 
 def take_a_break():
@@ -203,6 +216,47 @@ if show_pid_settings:
     params.addArgument(ki_p2, 'I postion 2', group='Position')
     params.addArgument(kd_p2, 'D postion 2', group='Position')
 
+
+display_axis1 = True
+display_axis2 = True    
+display_sim = True
+display_io = True
+display_angles = True
+display_angles_ctrl = True
+display_pos = True
+display_pos_ctrl = True
+display_dsp = True
+dislpay_dsp = True
+display_other = True
+    
+if show_display_settings:
+   params.addArgument(display_axis1, 'Display axis 1 data (axis must be enabled)', group='Display')
+   params.addArgument(display_axis2, 'Display axis 2 data (axis must be enabled)', group='Display')
+   params.addArgument(display_sim, 'Display sim time and step', group='Display')
+   params.addArgument(display_io, 'Display I/O signals (ADCs, load cells, servos)', group='Display')
+   params.addArgument(display_angles, 'Display angular information', group='Display')
+   params.addArgument(display_angles_ctrl, 'Display angular controller data', group='Display')
+   params.addArgument(display_pos, 'Display position information', group='Display')
+   params.addArgument(display_pos_ctrl, 'Display position controller data', group='Display')  
+   params.addArgument(display_other, 'Display other info', group='Display') 
+   
+display_categories = {
+                      'axis1':enable_axis_1 and display_axis1,
+                      'axis2':enable_axis_2 and display_axis2,
+                      'io':display_io,
+                      'angles':display_angles,
+                      'angles_ctrl':display_angles_ctrl,
+                      'pos':display_pos,
+                      'pos_ctrl':display_pos_ctrl,
+                      'dsp': dislpay_dsp,
+                      'other': display_other,
+                      'sim': display_sim,
+                     }
+
+
+    
+
+
 # Some of the Format codes
 #    x     pad byte       no value      
 #    c     char           string of length 1     
@@ -270,6 +324,9 @@ class Controller(object):
     
     def stop(self):
         pass
+     
+    def get_3d_ball_position(self):
+       return 0.,0.,0.4
             
 
     def get_display_data(self):
@@ -337,19 +394,16 @@ class PidController(Controller):
         
         axis = str(self.axis)
         
-        return {'pid_out'+axis : self.pid_out,
-                'pid_op'+axis :self.op,
-                'pid_oi'+axis :self.oi,
-                'pid_od'+axis :self.od,
-                'pid_kc'+axis :self.kc,
-                'pid_kp'+axis :self.kp,
-                'pid_ki'+axis :self.ki,
-                'pid_kd'+axis :self.kd,
-                
-                # 'pid_error'+axis : self.pid.error,
-                # 'pid_oi'+axis : self.pid.oi,
-               'pid_derivative'+axis : self.derivative,
-               'pid_integral'+axis : self.integral,
+        return {'pid_out'+axis: (self.pid_out, "angles_ctrl" ,axis),
+                'pid_op'+axis : (self.op,"angles_ctrl" ,axis),
+                'pid_oi'+axis : (self.oi,"angles_ctrl" ,axis),
+                'pid_od'+axis : (self.od,"angles_ctrl" ,axis),
+                'pid_kc'+axis : (self.kc,"angles_ctrl" ,axis),
+                'pid_kp'+axis : (self.kp,"angles_ctrl" ,axis),
+                'pid_ki'+axis : (self.ki,"angles_ctrl" ,axis),
+                'pid_kd'+axis : (self.kd,"angles_ctrl" ,axis) ,
+                'pid_derivative' + axis : (self.derivative, "angles_ctrl" ,axis),
+                'pid_integral' + axis : (self.integral, "angles_ctrl" ,axis),
                 
                 }
         
@@ -465,6 +519,7 @@ class Derivator(Controller):
         self.prefix = 'pos'
         self.axis = axis
         self.error_history = [(0,0.01),(0,0.01),(0,0.01),(0,0.01),(0,0.01)]
+        
         self.error = 0
         self.derivative = 0
         self.integral = 0
@@ -641,8 +696,7 @@ class ServoPid(Controller):
             value = table_max_angle
         elif  value  <= table_min_angle:
             m = 'MIN!'
-            value = table_min_angle
-        
+            value = table_min_angle   
         if self.axis == 1:    
             self.parent.target_angle1 = value
         if self.axis == 2:
@@ -663,7 +717,8 @@ class ServoPid(Controller):
             self._set_angle(v)
         
     def key_d(self):
-        self._set_angle(0.)
+        if self.keyboard_enabled:
+            self._set_angle(0.)
 
     def key_f(self): 
         if self.keyboard_enabled:
@@ -683,15 +738,16 @@ class ServoPid(Controller):
         name = '1'
         if self.axis == 2:
             name = '2'
-            
-        data['servo_pid_out'+name] = self.pid_out
-        data['servo_pid_op'+name] = self.pid.op
-        data['servo_pid_oi'+name] = self.pid.oi
-        data['servo_pid_od'+name] = self.pid.od 
+        axis = self.axis    
+        data['servo_pid_out'+name] = (self.pid_out, "angles_ctrl" , axis)
+        data['servo_pid_op'+name]  = (self.pid.op,  "angles_ctrl" , axis)
+        data['servo_pid_oi'+name]  = (self.pid.oi,  "angles_ctrl" , axis)
+        data['servo_pid_od'+name]  = (self.pid.od,  "angles_ctrl" , axis)
 
-        data['servo_pid_error' + name] = self.pid.error 
-        data['servo_pid_derivative' + name] = self.pid.derivative
-        data['servo_pid_integral' + name] = self.pid.integral
+        data['servo_pid_error' + name] = (self.pid.error, "angles_ctrl" , axis)
+        data['servo_pid_derivative' + name] = (self.pid.derivative, "angles_ctrl" , axis) 
+        data['servo_pid_integral' + name] = (self.pid.integral, "angles_ctrl" , axis)
+        
         return data
     
     def loop(self, step, sim_time, delta_time):
@@ -754,8 +810,7 @@ class MultiController(Controller):
         self.target_position2 =  0.        
         self.encoder2 = (encoder2_min + encoder2_max) /2
         self.load_cell2 = (load_cell2_min + load_cell2_max) /2
-        
-        
+            
         self.filtered_pos1 = 0.
         self.filtered_pos2 = 0.
         
@@ -776,6 +831,14 @@ class MultiController(Controller):
         
         self.filtered_servo1 = None
         self.filtered_servo2 = None
+    
+    
+    def get_3d_ball_position(self):
+       x,y,z = Controller.get_3d_ball_position(self)
+       x = self.current_pos1
+       y = self.current_pos2
+       return x,y,z
+    
         
     def key_right(self):  
         for controller_data in self.controllers:
@@ -860,37 +923,33 @@ class MultiController(Controller):
 
         data = {
 
-#        'current_angle1':self.current_angle1,
-#        'current_pos1':self.current_pos1,
-#        'target_angle1':self.target_angle1,
-#        'target_position1':self.target_position1,        
-#        'encoder1':self.encoder1,
-#        'load_cell1':self.load_cell1,
-#        'servo1':self.servo1,
-#        'filtered_pos1':self.filtered_pos1,
-#        'filtered_load_cell1':self.filtered_load_cell1,
-#        'filtered_servo1':self.filtered_servo1,
+        'current_angle1':(self.current_angle1,"angles" , 1),
+        'current_pos1':  (self.current_pos1,"pos" , 1),
+        'target_angle1': (self.target_angle1,"angles" , 1),
+        'target_position1': (self.target_position1, "pos",1),       
+        'encoder1':(self.encoder1, "io",1), 
+        'load_cell1':(self.load_cell1, "io",1), 
+        'servo1':(self.servo1, "io",1), 
+        'filtered_pos1':(self.filtered_pos1, "dsp", 1),
+        'filtered_load_cell1':(self.filtered_load_cell1, "dsp", 1),
+        'filtered_servo1':(self.filtered_servo1, "dsp", 1),
 
-        'current_angle2':self.current_angle2,
-        'current_pos2':self.current_pos2 ,
-        'target_angle2':self.target_angle2,
-        'target_position2':self.target_position2 ,       
-        'encoder2':self.encoder2,
-        'load_cell2':self.load_cell2,
-        'servo2':self.servo2,
-        'filtered_pos2':self.filtered_pos2,
-        'filtered_load_cell2':self.filtered_load_cell2,
-        'filtered_servo2': self.filtered_servo2,
+        'current_angle2':(self.current_angle2, "angles", 2),
+        'current_pos2':(self.current_pos2 , "pos", 2),
+        'target_angle2':(self.target_angle2, "angles", 2),
+        'target_position2':(self.target_position2 , "pos", 2),       
+        'encoder2':(self.encoder2, "io", 2),
+        'load_cell2':(self.load_cell2, "io", 2),
+        'servo2':(self.servo2, "io", 2),
+        'filtered_pos2':(self.filtered_pos2, "dsp", 2),
+        'filtered_load_cell2':(self.filtered_load_cell2, "dsp", 2),
+        'filtered_servo2': (self.filtered_servo2, "dsp", 2),
         
-        'error_pos2':   self.error_pos2,
-        #'error_change2':self.error_change2,
-        #'integral2':self.integral2,
-        
-        #'pos_derivative1' : self.pos_derivative1,
-        'pos_derivative2' : self.pos_derivative2,
-        
-        'pos_integral1': self.pos_integral1,
-        'pos_integral2':self.pos_integral2,
+        'error_pos2': (self.error_pos2, "dsp", 2),
+        'pos_derivative2': (self.pos_derivative2, "dsp", 2),
+       
+        'pos_integral1': (self.pos_integral1, "dsp", 1),
+        'pos_integral2': (self.pos_integral2, "dsp", 2),
 
         
         }
@@ -1026,6 +1085,12 @@ class MultiController(Controller):
     
 class KeyboardController(Controller):
     
+    def get_3d_ball_position(self):
+       x,y,z = Controller.get_3d_ball_position(self)
+       x = self.pos1
+       y = self.pos2
+       return x,y,z
+   
     def __init__(self):
         self.error_code = 0
         self.load_cell1 = 0
@@ -1093,25 +1158,23 @@ class KeyboardController(Controller):
             
     def get_display_data(self):
         data = {}
+
+        data['load_cell1'] =  (self.load_cell1,"",1)
+        data['load_cell2'] =  (self.load_cell2,"",2)    
+        data['filtered_load_cell2'] = (self.filtered_load_cell2,"",2)    
+        data['encoder1'] = (self.encoder1,"",1)
+        data['encoder2'] = (self.encoder2,"",2) 
+        data['servo1']   = (self.servo1,"",1)
+        data['servo2']   = (self.servo2,"",2)
+        data['angle1']   = (encoder1_to_angle(self.encoder1),"",1)
+        data['angle2']   = (encoder2_to_angle(self.encoder2),"",2)
         
-        #data['error_code'] =  self.error_code
-        data['load_cell1'] =  self.load_cell1
-        data['load_cell2'] =  self.load_cell2    
-        data['filtered_load_cell2'] = self.filtered_load_cell2    
-        data['encoder1'] =  self.encoder1
-        data['encoder2'] =  self.encoder2 
-        data['servo1']   = self.servo1
-        data['servo2']   = self.servo2
-        data['angle1']   = encoder1_to_angle(self.encoder1)
-        data['angle2']   = encoder2_to_angle(self.encoder2)
+        data['current_pos1']   = (self.pos1,"",1)
+        data['current_pos2']   = (self.pos2,"",2)
         
-        data['current_pos1']   = self.pos1
-        data['current_pos2']   = self.pos2
+        data['filtered_pos2'] = (self.filtered_pos1,"",2)
+        data['filtered_pos1'] = (self.filtered_pos2,"",1)
         
-        data['filtered_pos2'] = self.filtered_pos1
-        data['filtered_pos1'] = self.filtered_pos2
-        
-        data['step'] = self.step
         return data   
 
     #'encoder2'
@@ -1265,6 +1328,7 @@ def scale(value, in1, in2, out1, out2):
     resp = out1 + range_out * (value - in1) / range_in 
     return resp
 
+
 def rot_speed_to_servo(rot_speed):
     
     min = servo_min
@@ -1272,15 +1336,18 @@ def rot_speed_to_servo(rot_speed):
     
     int_resp = 0
     if rot_speed > 0:
-        min = 300.
+        min = servo_dead_band_up
         max = servo_max
         resp = scale(rot_speed, 0., table_max_rot_speed, min, max)
+        resp *= servo_bias
         int_resp =  int (resp)
+        
         
     if rot_speed < 0:
         min = servo_min 
-        max = 0.
+        max = 0. - servo_dead_band_down
         resp = scale(rot_speed, table_min_rot_speed, 0., min, max)
+        resp = resp / servo_bias
         int_resp =  int (resp)
     #resp = scale(rot_speed, table_min_rot_speed, table_max_rot_speed, min, max)
     #int_resp = int(resp) # convert to integer
@@ -1569,7 +1636,7 @@ class Loop(object):
         
         data = self.controller.get_display_data()
         for k,v in data.iteritems():
-            print "%s %.10f" % (k,v)
+            print "%s %.10f" % (k,v[0])
         
         
     def loop(self):
@@ -1621,22 +1688,23 @@ class AngleController(Controller):
     
     def get_display_data(self):    
       
-        encoder1 = self.encoder1
-        angle = self.current_angle1
-        target_angle = self.target_angle1
-        rot_speed =  self.current_rot_speed1
-        
-        angle_error1 = self.error
-        rot_speed_error1= self.speed_error 
-        
-        fuzzy_in1 =  self.fuzz._sigs_in['err'].evaluation.values()
-        fuzzy_in2 =  self.fuzz._sigs_in['speederr'].evaluation.values()
-        rule_activations = []
-        fuzzy_rules = self.fuzzy_rules
-     
-        fuzzy_rot_speed1 = self.fuzzy_rot_speed1  
-        fuzzy_servo = self.servo1 
-        return locals()
+        return {}
+#        encoder1 = self.encoder1
+#        angle = self.current_angle1
+#        target_angle = self.target_angle1
+#        rot_speed =  self.current_rot_speed1
+#        
+#        angle_error1 = self.error
+#        rot_speed_error1= self.speed_error 
+#        
+#        fuzzy_in1 =  self.fuzz._sigs_in['err'].evaluation.values()
+#        fuzzy_in2 =  self.fuzz._sigs_in['speederr'].evaluation.values()
+#        rule_activations = []
+#        fuzzy_rules = self.fuzzy_rules
+#     
+#        fuzzy_rot_speed1 = self.fuzzy_rot_speed1  
+#        fuzzy_servo = self.servo1 
+#        return locals()
             
     def set_angle(self, target_angle):
         self.target_angle = target_angle
@@ -1702,35 +1770,32 @@ class KalmanFilter(Filter):
     
     def eval(self, history):
         return self.calman.filter( history[-1])
-    
 
 
 class Application( kepler_sim.BallPlateWorld ):   
-    #function that initializes everything needed 
-      
+    # function that initializes everything needed       
     def __init__( self, controller, log_2_memory ):
-        kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory)
+        kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory, display_categories)
         # self.add_slider()
 
     def _get_data(self):  
         return data
             
-
     def loop(self, task):
-       kepler_sim.BallPlateWorld.loop(self, task)
+       response = kepler_sim.BallPlateWorld.loop(self, task)
        #x,y = self.controller.get_ball_xy()
-       x = 0.33
-       y= 0.33
-       z = 0.4 # magic number 
+       x,y,z = self.controller.get_3d_ball_position()
        alpha = 0
        beta = 0
        dt = 0.05
+       x *= 15.
+       y *= 15.
+       # print "ball [%.4f, %.4f]" % (x,y)
        self.set_3d_scene(x,y,z, alpha, beta, dt)
-
+       return response
 
 
 #
-# XXX yyy
 #                
 if params.loadParams():
     table_min_angle = math.asin(table_min_height/table_distance_from_center)
@@ -1745,7 +1810,6 @@ if params.loadParams():
         controller = KeyboardController()
     if controller_name == 'servo':
         controller = ServoController()
-        
     if controller_name == 'sine':
         controller = MultiController()
         if filter_name == 'mean':    
@@ -1856,13 +1920,14 @@ if params.loadParams():
         #servo_pid05 -8,0,0
         #servo_pid06 -6, 0, 0 
         #servo_pid07 -6, 0, 0 
-        pid1 = True
+        
         show_data = True
-        if pid1:
+        if enable_axis_1:
             servo1 = ServoPid(1, kp_s1, ki_s1, kd_s1, False, show_data)
             controller.add_controller( servo1, 1)
-        servo2 = ServoPid(2, kp_s2, ki_s2, kd_s2, True, show_data)
-        controller.add_controller( servo2, 1) 
+        if enable_axis_2:
+           servo2 = ServoPid(2, kp_s2, ki_s2, kd_s2, True, show_data)
+           controller.add_controller( servo2, 1) 
          
     if controller_name == 'fuzzy_v1':
         
@@ -1892,7 +1957,7 @@ if params.loadParams():
         app = Loop(controller)
             
     if interface_name == 'simulator':
-        app = kepler_sim.BallPlateSimulatorWorld(controller,log2memory)
+        app = kepler_sim.BallPlateSimulatorWorld(controller,log2memory, display_categories)
         interface = KeplerSimInterface(app)  
     interface.error_motor1 = makeError(2,1) 
     controller.set_interface(interface,None)
