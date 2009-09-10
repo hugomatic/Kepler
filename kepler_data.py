@@ -35,12 +35,11 @@ class KeplerLogger(object):
             logger.debug(s )
         for k,value in data.iteritems():
             if k not in exclude_list:
-                s = "%s = %s " %  (k, value)
+                s = "%s = %s " %  (k, value[0])
             if self.memory:
                 self.data.append(s)
             else:
                 logger.debug(s)
-    
     
     def load_from_file(self, file_name):
         self.history = {'step':[], 'time':[]}
