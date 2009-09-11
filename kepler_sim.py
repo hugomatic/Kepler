@@ -77,12 +77,12 @@ def processCollisionSolid(solid):
     print solid
 
 def processCollisionNode(cnode):
-    print "Collision Node:", cnode.getName()
+    #print "Collision Node:", cnode.getName()
     num = cnode.getNumSolids()
-    print "solids:", num
+    #print "solids:", num
     for i in range(num):
         solid = cnode.getSolid(i)
-        print "solid ",str(i+1),"/",str(num)
+        #print "solid ",str(i+1),"/",str(num)
         processCollisionSolid(solid)
         
 def processGeom(geom):
@@ -158,7 +158,7 @@ def create_table_geom():
     return geom
 
 def process_wall_collide_geom(geom):
-    print 'process wall geom'
+    #print 'process wall geom'
     print geom
 
 def add_collision_nodes(model):
@@ -218,7 +218,7 @@ class WorldBase(DirectObject):
 
         taskMgr.add( self.loop, "loop" )
 
-        self.show_details = True
+        self.enable_screen_updates = True
         self.log = KeplerLogger(mem_logger)        
         self.logging = False
         self.accept("p", self.key_p)
@@ -255,8 +255,45 @@ class WorldBase(DirectObject):
         
         self.text_refresh_band = 10
         self.text_refresh_count = self.text_refresh_band
-        self._set_title("Hugomatic")
+        self._set_title("Keplermatic")
+        
+        self.init_gui()
+        
 
+    def init_gui(self):
+        
+        x = -0.9
+        y = 0.7
+        inc_y = -0.1
+        cb = CallBack("Logging", self.display_categories, self)
+        self.add_gui_checkbox("Logging", False, x, y, cb.callback)
+        y += inc_y
+        cb = CallBack("Update", self.display_categories,self)
+        self.add_gui_checkbox("Update", True, x, y, cb.callback)
+        y += inc_y  
+        y += inc_y 
+        keys = self.display_categories.keys()
+        keys.sort()
+  
+        for k in keys:
+            if k in ["axis1","axis2"]:
+               cb = CallBack(k, self.display_categories,self)
+               category_name = k
+               enabled = self.display_categories[category_name]
+               self.add_gui_checkbox(category_name, enabled, x, y, cb.callback)
+               y += inc_y
+        y += inc_y  
+        y += inc_y 
+                
+        for k in keys:
+            if k not in ["axis1","axis2"]:
+                  cb = CallBack(k, self.display_categories,self)
+                  category_name = k
+                  enabled = self.display_categories[category_name]
+                  self.add_gui_checkbox(category_name, enabled, x, y, cb.callback)
+                  y += inc_y
+        
+  
     def _set_title(self, title):
       from pandac.PandaModules import ConfigVariableString
       mygameserver = ConfigVariableString("window-title","Panda")
@@ -280,7 +317,7 @@ class WorldBase(DirectObject):
         return Task.cont
 
     def _refresh_text(self, txt):
-        if not self.show_details:
+        if not self.enable_screen_updates:
             return 
         self.text_refresh_count -=1
         if self.text_refresh_count <0:
@@ -295,43 +332,51 @@ class WorldBase(DirectObject):
 
             keys = data.keys()
             keys.sort()
-            txt += "logging: %s\n" % self.logging
+            txt += "logging: %s\n" % self.logging      
+            #print keys
+            show_axis1 = self.display_categories['axis1']
+            show_axis2 = self.display_categories['axis2']
             
             for name in keys:
                 if name == 'self': continue
                 display_data = data[name]                
-                value, category,axis = display_data   
-                show_it = self.display_categories[category]
-                if axis == 1 and self.display_categories['axis1']:
-                   show_it = False
-                if axis == 2 and self.display_categories['axis2']:
-                   show_it = False
-                if show_it:                   
-                   txt += "%s: %s\n" % (name, value)
+                #print display_data
+                value, category, axis = display_data   
+                if category not in self.display_categories.keys():
+                   category = "other"
+                show_category = self.display_categories[category]
+                show_it = show_category
+                if not show_it:
+                   #print "  %s hidden (category %s hidden)" % (name, category)
+                   pass
+                if axis == 1:
+                    if show_axis1 == False:
+                       #print "  %s hidden (axis 1)" % name
+                       show_it = False
+                if axis == 2:
+                    if show_axis2 == False:
+                       #print "  %s hidden (axis 2)" % name
+                       show_it = False
+                
+                
+                if show_it:   
+                   #print "**** name %s, cat %s [%s], axis %s, value %s show1 %s, show2 %s" %(name, category, show_it, axis, value, show_axis1, show_axis2)              
+                   value_str = "%s" % value
+                   if type(value) == type(0.): # float
+                      value_str = "%.10f" % value
+                   txt += "%s: %s\n" % (name, value_str)
+                else:   
+                   pass
+                   #print "XXXX  name %s, cat %s [%s], axis %s, value %s show1 %s, show2 %s" %(name, category, show_it, axis, value, show_axis1, show_axis2)              
+                
             self.txt.appendText(txt)
  
-    def call_back(self):
-        print "hurray"
     
-    def add_check(self, text, value, x, y, callback):
+    def add_gui_checkbox(self, text, value, x, y, callback):
        b = DirectCheckButton(text = text ,scale=.05, pos=(x,0,y), command=callback)
        b["indicatorValue"] = value
        return b
        
-    def add_slider(self):
-        #slider = DirectSlider(range=(0,100), value=50, pageSize=1, command=self.call_back)
-        
-        left = 0.1
-        right = 0.2
-        bottom = 0.1
-        top = 0.11
-        frame = (left, right, bottom, top)
-        
-        b = DirectButton(text = ("OK", "click!", "rolling over", "disabled"), scale=.05, pos=(-.3,.6,0), command=self.call_back)
-        b = DirectButton(text = ("ALLO", "click!", "rolling over", "disabled"), scale=.05, pos=(.3,-0.6,-0.5), command=self.call_back)
-
-        #b['frameSize'] = frame
-        b.resetFrameSize()
 
     def quit(self):
         self.controller.stop()
@@ -340,7 +385,8 @@ class WorldBase(DirectObject):
         sys.exit()
         
     def log_start_stop(self):
-        if self.logging:
+        
+        if self.logging: # stopping
             self.controller.stop()
             self.log.dump(get_data_logger())
             self.log.data = []
@@ -349,8 +395,8 @@ class WorldBase(DirectObject):
         print "Logging %s" % self.logging 
 
     def key_p(self):
-      self.show_details = not self.show_details
-      print "show_details=", self.show_details
+      self.enable_screen_updates = not self.enable_screen_updates
+      print "enable_screen_updates=", self.enable_screen_updates
         
     def key_right(self):  
         self.controller.key_right()
@@ -388,14 +434,40 @@ class WorldBase(DirectObject):
         self.controller.key_b()   
     def key_n(self):    
         self.controller.key_n()    
+
+
+class CallBack(object):
+   def __init__(self, name, display_categories, world):
+      self.name = name
+      self.world = world
+      self.display_categories = display_categories
+   
+   def callback(self,state):
+      if self.name == "Logging":
+         print "Logging ", state
+         self.world.log_start_stop()
+         
+      if self.name == "Update":
+         print "Update ", state
+         self.world.enable_screen_updates = state
+      self.display_categories[self.name] = state
+      
+
+
+   
+
    
 class BallPlateWorld(WorldBase):
     
   def __init__(self, controller, log_2_memory, display_categories):    
     WorldBase.__init__(self, controller, log_2_memory, display_categories)
+    self.display_categories = display_categories
     self.last_time = time.time()
     self.step = 0
     self.__init_kepler_scene()
+    
+      
+    
   
   def set_3d_scene(self, x,y,z, alpha, beta, dt):
     new_position = Point3(x,y,z)
@@ -669,7 +741,7 @@ class BallPlateSimulatorWorld(BallPlateWorld):
     self.mainLoop = taskMgr.add(self.rollTask, "rollTask")
     self.mainLoop.last = 0
     
-    self.add_slider()
+    #self.add_slider()
 
    
   #This is the task that deals with making everything interactive

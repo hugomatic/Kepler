@@ -215,6 +215,7 @@ if show_pid_settings:
     params.addArgument(kd_p2, 'D postion 2', group='Position')
 
 
+display_categories = {}
 display_axis1 = True
 display_axis2 = True    
 display_sim = True
@@ -358,6 +359,7 @@ class Controller(object):
 class PidController(Controller):
     
     def __init__(self, axis, kp, ki, kd, kc, filter_error = True):
+        print "PidController  axis %(axis)s  PID[%(kp)s,%(ki)s,%(kd)s] kc=%(kc)s  filter=%(filter_error)s ( for error signal )" % locals()
         Controller.__init__(self) 
         self.filter_error = filter_error
         #self.pid = pid_controller.Pid(kp, ki, kd)        
@@ -370,22 +372,24 @@ class PidController(Controller):
         self.od = 0 
         self.axis = axis
         self.pid_out = 0.
+        self.error = 0.
         print "Position PID: "  
 
     def get_display_data(self):
         
         axis = str(self.axis)
         
-        return {'pid_out'+axis: (self.pid_out, "angles_ctrl" ,axis),
-                'pid_op'+axis : (self.op,"angles_ctrl" ,axis),
-                'pid_oi'+axis : (self.oi,"angles_ctrl" ,axis),
-                'pid_od'+axis : (self.od,"angles_ctrl" ,axis),
-                'pid_kc'+axis : (self.kc,"angles_ctrl" ,axis),
-                'pid_kp'+axis : (self.kp,"angles_ctrl" ,axis),
-                'pid_ki'+axis : (self.ki,"angles_ctrl" ,axis),
-                'pid_kd'+axis : (self.kd,"angles_ctrl" ,axis) ,
-                'pid_derivative' + axis : (self.derivative, "angles_ctrl" ,axis),
-                'pid_integral' + axis : (self.integral, "angles_ctrl" ,axis),
+        return {'pid_out'+axis: (self.pid_out, "pos_ctrl" ,self.axis),
+                'pid_op'+axis : (self.op,"pos_ctrl" ,self.axis),
+                'pid_oi'+axis : (self.oi,"pos_ctrl" ,self.axis),
+                'pid_od'+axis : (self.od,"pos_ctrl" ,self.axis),
+                'pid_kc'+axis : (self.kc,"pos_ctrl" ,self.axis),
+                'pid_kp'+axis : (self.kp,"pos_ctrl" ,self.axis),
+                'pid_ki'+axis : (self.ki,"pos_ctrl" ,self.axis),
+                'pid_kd'+axis : (self.kd,"pos_ctrl" ,self.axis) ,
+                'pid_error'+ axis : (self.error,"pos_ctrl" ,self.axis),
+                #'pid_derivative' + axis : (self.derivative, "pos_ctrl" ,self.axis),
+                #'pid_integral' + axis : (self.integral, "pos_ctrl" ,self.axis),
                 
                 }
         
@@ -412,7 +416,8 @@ class PidController(Controller):
                 error = self.parent.target_position2 - self.parent.current_pos2
             derivative = self.parent.pos_derivative2            
             integral = self.parent.pos_integral2
-            
+        
+        self.error = error    
         self.op = self.kp * error
         self.oi = self.ki * integral
         self.od = self.kd * derivative
@@ -496,6 +501,9 @@ class PidController(Controller):
 class Derivator(Controller):
     
     def __init__(self, axis, prefix = 'pos', deriv_pv = False): 
+       
+        print "Derivator: axis %s derive on process value %s" %(axis, deriv_pv)
+       
         Controller.__init__(self)
         self.deriv_pv = deriv_pv
         self.prefix = 'pos'
@@ -560,9 +568,10 @@ class Derivator(Controller):
 
 class ServoMeanFilter(Controller):
 
-    def __init__(self, axis, band):   
+    def __init__(self, axis, band):  
         self.axis = axis
         self.band = band
+        print "ServoMeanFilter axis = %s, samples = %s" % (self.axis, self.band)
         self.count_down = -1
         self.history = []
         for i in range(self.band):
@@ -648,8 +657,8 @@ class MeanFilter(Filter):
         
 class ServoPid(Controller):
     
-    def __init__(self, axis, kp, ki, kd, keyboard_enabled, display_data):
-        self.display_data = display_data
+    def __init__(self, axis, kp, ki, kd, keyboard_enabled):
+        #self.display_data = display_data
         self.pid = pid_controller.Pid(kp , ki, kd ) #(-80., 0., 0.,) #(-55., -0.00001, 0. ) # kc -110. starts to oscillate
         self.axis = axis # 1 or 2, for x or y
         self.keyboard_enabled = keyboard_enabled
@@ -715,8 +724,8 @@ class ServoPid(Controller):
         
     def get_display_data(self):
         data = {}
-        if not self.display_data:
-            return data
+#        if not self.display_data:
+#            return data
         name = '1'
         if self.axis == 2:
             name = '2'
@@ -909,7 +918,7 @@ class MultiController(Controller):
         'current_pos1':  (self.current_pos1,"pos" , 1),
         'target_angle1': (self.target_angle1,"angles" , 1),
         'target_position1': (self.target_position1, "pos",1),       
-        'encoder1':(self.encoder1, "io",1), 
+        'ADC1':(self.encoder1, "io",1), 
         'load_cell1':(self.load_cell1, "io",1), 
         'servo1':(self.servo1, "io",1), 
         'filtered_pos1':(self.filtered_pos1, "dsp", 1),
@@ -920,20 +929,21 @@ class MultiController(Controller):
         'current_pos2':(self.current_pos2 , "pos", 2),
         'target_angle2':(self.target_angle2, "angles", 2),
         'target_position2':(self.target_position2 , "pos", 2),       
-        'encoder2':(self.encoder2, "io", 2),
+        'ADC2':(self.encoder2, "io", 2),
         'load_cell2':(self.load_cell2, "io", 2),
         'servo2':(self.servo2, "io", 2),
         'filtered_pos2':(self.filtered_pos2, "dsp", 2),
         'filtered_load_cell2':(self.filtered_load_cell2, "dsp", 2),
         'filtered_servo2': (self.filtered_servo2, "dsp", 2),
         
+        'error_pos1': (self.error_pos2, "dsp", 1),
         'error_pos2': (self.error_pos2, "dsp", 2),
+        'pos_derivative1': (self.pos_derivative2, "dsp", 1),
         'pos_derivative2': (self.pos_derivative2, "dsp", 2),
        
         'pos_integral1': (self.pos_integral1, "dsp", 1),
         'pos_integral2': (self.pos_integral2, "dsp", 2),
 
-        
         }
             
         for controller_data in self.controllers:
@@ -945,6 +955,8 @@ class MultiController(Controller):
         return data
                 
     def add_controller(self, controller, band):
+        type_s = str(type(controller))
+        print "Scheduling controller of type %s at band %s" % (type_s,band)
         count_down = band
         step = 0
         last_sim_time = 0.
@@ -1141,21 +1153,22 @@ class KeyboardController(Controller):
     def get_display_data(self):
         data = {}
 
-        data['load_cell1'] =  (self.load_cell1,"",1)
-        data['load_cell2'] =  (self.load_cell2,"",2)    
-        data['filtered_load_cell2'] = (self.filtered_load_cell2,"",2)    
-        data['encoder1'] = (self.encoder1,"",1)
-        data['encoder2'] = (self.encoder2,"",2) 
-        data['servo1']   = (self.servo1,"",1)
-        data['servo2']   = (self.servo2,"",2)
-        data['angle1']   = (encoder1_to_angle(self.encoder1),"",1)
-        data['angle2']   = (encoder2_to_angle(self.encoder2),"",2)
+        data['load_cell1'] =  (self.load_cell1,"io",1)
+        data['load_cell2'] =  (self.load_cell2,"io",2)    
+        data['filtered_load_cell1'] = (self.filtered_load_cell1,"dsp",1) 
+        data['filtered_load_cell2'] = (self.filtered_load_cell2,"dsp",2)    
+        data['motorADC1'] = (self.encoder1,"io",1)
+        data['motorADC2'] = (self.encoder2,"io",2) 
+        data['servo1']   = (self.servo1,"io",1)
+        data['servo2']   = (self.servo2,"io",2)
+        data['angle1']   = (encoder1_to_angle(self.encoder1),"angles",1)
+        data['angle2']   = (encoder2_to_angle(self.encoder2),"angles",2)
         
-        data['current_pos1']   = (self.pos1,"",1)
-        data['current_pos2']   = (self.pos2,"",2)
+        data['current_pos1']   = (self.pos1,"pos",1)
+        data['current_pos2']   = (self.pos2,"pos",2)
         
-        data['filtered_pos2'] = (self.filtered_pos1,"",2)
-        data['filtered_pos1'] = (self.filtered_pos2,"",1)
+        data['filtered_pos2'] = (self.filtered_pos1,"dsp",2)
+        data['filtered_pos1'] = (self.filtered_pos2,"dsp",1)
         
         return data   
 
@@ -1265,6 +1278,16 @@ class PositionSetter(Controller):
         self.max_amplitude = 0.2
         self.time = 0.
         self.axis = axis
+        self.amplitude_delta = 0.5
+        
+        print "PositionSetter axis = %s" % axis
+        print "   period %s" % (self.period)
+        print "   zero %s" % (self.zero)
+        print "   start amplitude %s" % (self.amplitude)
+        print "   delta amplitude %s" % (self.amplitude)
+        print "   max amplitude %s" % (self.amplitude)
+        print 
+        
         
     def key_q(self):
         print "PositionSetter.k"
@@ -1280,7 +1303,7 @@ class PositionSetter(Controller):
         if self.time > self.period:
             difference = self.time - self.period
             self.time = difference
-            self.amplitude = self.amplitude + 0.05
+            self.amplitude = self.amplitude + self.amplitude_delta
             if self.amplitude > self.max_amplitude:
                 self.amplitude = self.max_amplitude
             
@@ -1766,15 +1789,7 @@ class Application( kepler_sim.BallPlateWorld ):
     def __init__( self, controller, log_2_memory ):
         kepler_sim.BallPlateWorld.__init__(self, controller, log_2_memory, display_categories)
         # self.add_slider()
- 
-        x = -0.8
-        y = 0.75
-        inc_y = -0.1
-        self.add_check("Axis 1", display_categories['axis1'], x, y, toggle_display_axe1)
-        y += inc_y
-        self.add_check("Axis 2", display_categories['axis2'], x, y, toggle_display_axe2)
-       
-        
+            
         
     def _get_data(self):  
         return data
@@ -1792,36 +1807,32 @@ class Application( kepler_sim.BallPlateWorld ):
        self.set_3d_scene(x,y,z, alpha, beta, dt)
        return response
 
-
-#
-#                
+# shows the dialog to the user and sets the values"        
 if params.loadParams():
    
-    display_categories = {
-                      'axis1':enable_axis_1 and display_axis1,
-                      'axis2':enable_axis_2 and display_axis2,
-                      'io':display_io,
-                      'angles':display_angles,
-                      'angles_ctrl':display_angles_ctrl,
-                      'pos':display_pos,
-                      'pos_ctrl':display_pos_ctrl,
-                      'dsp': dislpay_dsp,
-                      'other': display_other,
-                      'sim': display_sim,
-                     }
-   
+    show_1 = enable_axis_1 and display_axis1
+    show_2 = enable_axis_2 and display_axis2
+    global display_categories
+    display_categories ['axis1'] = show_1
+    display_categories ['axis2']=show_2
+    display_categories ['io']=display_io
+    display_categories ['angles']=display_angles
+    display_categories ['angles_ctrl']=display_angles_ctrl
+    display_categories ['pos']=display_pos
+    display_categories ['pos_ctrl']=display_pos_ctrl
+    display_categories ['dsp']= dislpay_dsp
+    display_categories ['other']= display_other
+    display_categories ['sim']=display_sim
+               
     table_min_angle = math.asin(table_min_height/table_distance_from_center)
     table_max_angle = math.asin(table_max_height/table_distance_from_center)
-    
-    
+     
     print "Min table angle in rads %.4f" % table_min_angle
     print "Max table angle in rads %.4f" % table_max_angle
     print "Table min rot speed  %f" % table_min_rot_speed
     print "Table max rot speed  %f" % table_max_rot_speed
     
     controller = None
-    if  controller_name == 'keyboard':    
-        controller = KeyboardController()
     if controller_name == 'servo':
         controller = ServoController()
     if controller_name == 'sine':
@@ -1836,21 +1847,22 @@ if params.loadParams():
         angle_band = 1
         angle_controller = ServoPid(-0.01, 0., 0.) 
         controller.add_controller( angle_controller, angle_band)
-        
-    if controller_name == 'pid_pid':
-        
-        
+
+    if  controller_name == 'keyboard':    
+        controller = KeyboardController()
+                
+    if controller_name == 'pid_pid':      
         controller = MultiController()
         angle_band = 1
         filter_band = 1
         pid_band = filter_band
         
-        servo_filter1 = ServoMeanFilter(1, 5)
-        servo_filter2 = ServoMeanFilter(2, 5)
         if enable_axis_1:
+           servo_filter1 = ServoMeanFilter(1, 5)
            controller.add_controller( servo_filter1, filter_band)
         
         if enable_axis_2:
+           servo_filter2 = ServoMeanFilter(2, 5)
            controller.add_controller( servo_filter2, filter_band)
         
 #        pos1_filter = None
@@ -1870,11 +1882,7 @@ if params.loadParams():
 #        controller.add_controller(pos1_filter, 1)    
 #        controller.add_controller(pos2_filter, 1)    
         
-            
-        
-        
         if enable_axis_1:
-           
            deriv1 = Derivator(1, deriv_pv)
            controller.add_controller( deriv1, filter_band)
         if enable_axis_2:
@@ -1882,18 +1890,15 @@ if params.loadParams():
            controller.add_controller( deriv2, filter_band)    
     
         keyboard = False
-        show_data = False
         if enable_axis_1:
-            angle_controller1 = ServoPid(1, kp_s1, ki_s1, kd_s1, keyboard, show_data)
+            angle_controller1 = ServoPid(1, kp_s1, ki_s1, kd_s1, keyboard)
             controller.add_controller( angle_controller1, angle_band)
             
         if enable_axis_2:
-            angle_controller2 = ServoPid(2, kp_s2, ki_s2, kd_s2, keyboard, show_data)
+            angle_controller2 = ServoPid(2, kp_s2, ki_s2, kd_s2, keyboard)
             controller.add_controller( angle_controller2, angle_band)
-        
-        
+               
         filter_error = False # false to use raw error, True to use error based on filtered position
-        
         if enable_axis_1:
             pid_controller1 = PidController(1,kp_p1, ki_p1, kd_p1, kc_p1, filter_error) # split_pid 05
             controller.add_controller( pid_controller1, pid_band)
@@ -1930,10 +1935,10 @@ if params.loadParams():
         
         show_data = True
         if enable_axis_1:
-            servo1 = ServoPid(1, kp_s1, ki_s1, kd_s1, False, show_data)
+            servo1 = ServoPid(1, kp_s1, ki_s1, kd_s1, False)
             controller.add_controller( servo1, 1)
         if enable_axis_2:
-           servo2 = ServoPid(2, kp_s2, ki_s2, kd_s2, True, show_data)
+           servo2 = ServoPid(2, kp_s2, ki_s2, kd_s2, True)
            controller.add_controller( servo2, 1) 
          
     if controller_name == 'fuzzy_v1':

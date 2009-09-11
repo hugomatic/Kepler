@@ -2,7 +2,7 @@
 
 import commands
 import sys
-
+import os
 
 
 file_name = sys.argv[1]
@@ -22,6 +22,8 @@ class KeplerLogger(object):
             logger.debug(s)
     
     def load_from_file(self, file_name):
+        
+        print os.getcwd()
         self.history = {'step':[], 'time':[]}
         logfile = open(file_name,'r')
         try:
@@ -102,12 +104,12 @@ def norm(data, scale = 1.0, offset = 0.):
             hi = o
     delta = hi - lo
     for o in v:
-       if delta == 0 : # constant
+       if delta == 0. : # constant
             normalized_value = 0.5
        else:
             normalized_value =  (o - lo) / delta
             #normalized_value = 2. * normalized_value - 1.
-            norm_data.append(normalized_value * scale + offset)
+       norm_data.append(normalized_value * scale + offset)
     return norm_data
             
 steps = data['step']
@@ -135,25 +137,34 @@ err = None
 
 
 def add_plot(name, normalise = False, scale = 1.0, offset = 0.0):
-    print "add_plot ", name
-    list_of_values = data[name]
-    if normalise:
-        list_of_values = norm(list_of_values, scale, offset)
-    label = get_label(name)
-    pylab.plot(times, list_of_values, label = label)
+    print "add_plot [%s]" % name
+    if data.has_key(name) == False:
+       print "ERROR: no data named %s" % name
+    else:
+       list_of_values = data[name]
+       
+       if normalise:
+           print "  Normalisation: %s %s" % (scale, offset)
+           #print "  Samples: %s" % len(list_of_values)
+           list_of_values = norm(list_of_values, scale, offset)
+       print "  Samples: %s" % len(list_of_values)
+       label = get_label(name)
+       print "  Label: %s" % label
+       print "  Time samples %s" % len(times)
+       
+       pylab.plot(times, list_of_values, label = label)
 
 
 plot_all = False
-servo_pid_2 = True
+servo_pid_2 = False
 servo_pid_1 = False
 servo_pid_1_pid = False
 positions_2 = False
 derivative2 = False
 filter2 = False
 rotation_speed = False
-
-
-
+xy = False
+positions = True
 
 
 if plot_all:
@@ -161,6 +172,19 @@ if plot_all:
         if name not in ["time", "step"]:
             if name[-1] != "1":
                 add_plot(name, True)
+
+
+if xy:
+   x = data['current_pos1']
+   y = data['current_pos2']
+   pylab.plot(x, y)
+
+if positions:
+    add_plot('load_cell1')
+    add_plot('load_cell2')
+    add_plot('filtered_load_cell1')
+    add_plot('filtered_load_cell2')
+
 
 if rotation_speed:
     add_plot('servo2', True)
